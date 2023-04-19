@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Web Push client</title>
+</head>
+
+<body>
+  <div id="app">
+    <h1>POC WebPush</h1>
+    <div>
+      <h2>Mes alertes</h2>
+      <div id="no-alert">Aucune</div>
+      <ul id="alerts">
+      </ul>
+    </div>
+    <div>
+      <h2>Mes notifications</h2>
+      <div id="no-notification">Aucune</div>
+      <ul id="notifications">
+      </ul>
+    </div>
+    <form id="alert-form">
+      <h2>Créer une alerte</h2>
+      <input type="text" name="regex" placeholder="Regex du log" required>
+      <button type="submit">Créer</button>
+    </form>
+    <form id="log-form">
+      <h2>Simuler un log</h2>
+      <input type="text" name="log" placeholder="Log content" required>
+      <button type="submit">Simuler</button>
+    </form>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
