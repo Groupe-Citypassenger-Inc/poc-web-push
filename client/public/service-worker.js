@@ -1,30 +1,30 @@
-self.addEventListener('push', function (event) {
+async function getFirstCurrentClient() {
+  const matchingClients = await clients.matchAll({
+    type: 'window', includeUncontrolled: true,
+  });
+  if (matchingClients.length === 0) return null;
+  return matchingClients[0];
+}
+
+self.addEventListener('push', async (event) => {
   if (!event.data) return;
   const notification = event.data.json();
-  self.registration.showNotification(notification.title, {
-    body: notification.body,
-    data: {
-      date: new Date(),
-      ...notification.data,
-    },
-    icon: './android-chrome-192x192.png',
-  });
+  notification.data = {
+    date: new Date(),
+    ...notification.data,
+  };
+  notification.icon = './android-chrome-192x192.png';
+  self.registration.showNotification(notification.title, notification);
+  const client = await getFirstCurrentClient();
+  if (client) client.postMessage(notification);
 });
 
 self.addEventListener('notificationclick', function (event) {
-  const promiseChain = clients
-    .matchAll({ type: 'window', includeUncontrolled: true, })
-    .then((windowClients) => {
-      const openClient = windowClients.find((client) => {
-        const url = new URL(client.url);
-        return url.origin === self.location.origin;
-      });
-
-      if (openClient) return openClient.focus();
-
-      const alertUrl = new URL(self.location.origin);
-      return clients.openWindow(alertUrl);
-    });
+  const promiseChain = getFirstCurrentClient().then((client) => {
+    if (client) return client.focus();
+    const alertUrl = new URL(self.location.origin);
+    return clients.openWindow(alertUrl);
+  });
 
   event.waitUntil(promiseChain);
 });

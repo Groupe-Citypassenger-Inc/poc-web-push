@@ -19,16 +19,17 @@ sub notify {
       regex => $regex,
     },
   };
-  my $message = HTTP::Request::Webpush->new();
-  
-  $message->subject('mailto:hello@citypassenger.com');
-  $message->content(encode_json($payload));
-  $message->authbase64($ENV{PUBLIC_KEY}, $ENV{PRIVATE_KEY});
-  $message->header('TTL' => 60 * 60);
-
-  my $ua = Mojo::UserAgent->new;
 
   foreach my $subscription (@{$subscriptions}) {
+    my $message = HTTP::Request::Webpush->new();
+  
+    $message->subject('mailto:hello@citypassenger.com');
+    $message->content(encode_json($payload));
+    $message->authbase64($ENV{PUBLIC_KEY}, $ENV{PRIVATE_KEY});
+    $message->header('TTL' => 60 * 60);
+
+    my $ua = Mojo::UserAgent->new;
+
     $message->subscription($subscription);
     $message->encode();
 
@@ -41,7 +42,7 @@ sub notify {
     my $res = $ua->start($tx)->result;
 
     if ($res->is_success) {
-       $c->app->log->info("Push notification sent for $regex");
+       $c->app->log->info("Push notification sent for $regex to ". $subscription->{endpoint});
     } else {
       $c->app->log->warn("Failed to send push notification: " . $res->message);
       $c->rendered(500);
@@ -103,12 +104,14 @@ post '/wps/get-subscriptions' => sub {
 
   # Iterate over the keys and values in the data hash
   while (my ($key, $value) = each %$subscriptions) {
+    my $alert = { regex => $key, is_notified => 0 };
     foreach my $elem (@$value) {
       if ($elem->{endpoint} eq $subscription->{endpoint}) {
-        push @matching_keys, $key;
-        last;  
+        $alert->{is_notified} = 1;
+        last;
       }
     }
+    push @matching_keys, $alert;
   }
 
   $c->render( json => \@matching_keys );
@@ -128,8 +131,6 @@ del '/wps/delete-subscription' => sub {
   }
 
   my $regex_subscription = $subscriptions->{$regex};
-
-  print Dumper($regex_subscription);
 
   my $index_to_delete = -1;
   for (my $i = 0; $i < @$regex_subscription; $i++) {
@@ -155,7 +156,7 @@ del '/wps/delete-subscription' => sub {
 post '/wps/simulate-log' => sub {
   my $c = shift;
   my $log = $c->param('log');
-  my $group_name = 'dev-nathan';
+  my $group_name = $c->param('groupName');
 
   my ($subscriptions) = get_subscribtions($group_name);
 
