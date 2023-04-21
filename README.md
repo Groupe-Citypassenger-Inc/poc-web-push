@@ -21,7 +21,7 @@ Once evrything is set (serviceworker and subscription), the client must symply s
 
 ### Server side
 
-Notifications are send using [HTTP::Request::Webpush](https://metacpan.org/pod/HTTP::Request::Webpush). Server must first store subscription objects (from clients) and then can use Webpush to send notification to the wanted subscription. In order to encode the payload and provide authentification header it must have a private and and public (the same used in subscription creation) VAPID keys.
+Notifications are send using [HTTP::Request::Webpush](https://metacpan.org/pod/HTTP::Request::Webpush). Server must first store subscription objects (from clients) and then can use Webpush to send notification to the wanted subscriptions. In order to encode the payload and provide authentification header it must have a private and and public (the same used in subscription creation) VAPID keys.
 
 For this POC, subscriptions are stored in files like `subscriptions/$group_name.jon` with the following data structure:
 
@@ -69,7 +69,8 @@ cpanm Dotenv;
 
 ### Set env
 
-Public key must be share to front (api incoming)
+Public key must be share with front (api incoming).
+For the server there is 2 ways :
 
 - With .env file
 
