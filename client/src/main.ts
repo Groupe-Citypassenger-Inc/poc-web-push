@@ -25,7 +25,7 @@ async function displayNotifications() {
 }
 
 async function unsubscribe(subscription: PushSubscription, alert: Alert) {
-  fetch('/wps/delete-subscription', {
+  fetch('./wps/delete-subscription', {
     method: 'DELETE',
     body: new URLSearchParams({
       groupName: 'dev-nathan',
@@ -39,7 +39,7 @@ async function unsubscribe(subscription: PushSubscription, alert: Alert) {
 }
 
 function subscribe(subscription: PushSubscription, alert: Alert) {
-  fetch('/wps/subscribe', {
+  fetch('./wps/subscribe', {
     method: 'POST',
     body: new URLSearchParams({
       groupName: 'dev-nathan',
@@ -74,7 +74,7 @@ function displayAlerts(subscription: PushSubscription) {
 }
 
 function fetchAndDisplayAlerts(subscription: PushSubscription) {
-  fetch('/wps/get-subscriptions', {
+  fetch('./wps/get-subscriptions', {
     method: 'POST',
     body: new URLSearchParams({
       groupName: 'dev-nathan',
@@ -109,7 +109,7 @@ function handleSimulateLogForm() {
     event.preventDefault();
     const form = event.target as HTMLFormElement;
     const newLog = form.log.value;
-    fetch('/wps/simulate-log', {
+    fetch('./wps/simulate-log', {
       method: 'POST',
       body: new URLSearchParams({
         groupName: 'dev-nathan',
@@ -127,7 +127,7 @@ async function initialize(askPermissionBtn: HTMLElement) {
 
   const registerServiceWorker = async (): Promise<ServiceWorkerRegistration> => {
     console.log('Registering service worker');
-    await navigator.serviceWorker.register('/service-worker.js');
+    await navigator.serviceWorker.register('./service-worker.js');
     return await navigator.serviceWorker.ready;
   }
 
