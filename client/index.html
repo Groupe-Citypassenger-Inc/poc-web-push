@@ -13,23 +13,27 @@
     <h1>POC WebPush</h1>
     <div>
       <h2>Alertes de votre groupe</h2>
+      <p>Ensemble des alertes existantes pour votre groupe. Vous pouvez vous y abonner ou vous désabonner:</p>
       <div id="no-alert">Aucune</div>
       <ul id="alerts">
       </ul>
     </div>
     <div>
       <h2>Mes notifications</h2>
+      <p>Liste des notifications recus sur ce navigateur:</p>
       <div id="no-notification">Aucune</div>
       <ul id="notifications">
       </ul>
     </div>
     <form id="alert-form">
       <h2>Créer une alerte</h2>
+      <p>Lorsqu'un log correspondant à l'expression régulière sera recu, vous serez notifié sur ce navigateur.</p>
       <input type="text" name="regex" placeholder="Regex du log" required>
       <button type="submit">Créer</button>
     </form>
     <form id="log-form">
       <h2>Simuler un log</h2>
+      <p>Si une alerte correspond au log, une notification sera envoyée à tous les navigateurs qui sont abonnés à cette alerte.</p>
       <input type="text" name="log" placeholder="Log content" required>
       <button type="submit">Simuler</button>
     </form>
