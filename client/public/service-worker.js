@@ -1,9 +1,11 @@
+const appUrl = new URL('/notification', self.location.origin).href;
+
 async function getFirstCurrentClient() {
   const matchingClients = await clients.matchAll({
     type: 'window', includeUncontrolled: true,
   });
-  if (matchingClients.length === 0) return null;
-  return matchingClients[0];
+  const firstClient = matchingClients.find((client) => client.url === appUrl);
+  return firstClient;
 }
 
 self.addEventListener('push', async (event) => {
@@ -22,8 +24,8 @@ self.addEventListener('push', async (event) => {
 self.addEventListener('notificationclick', function (event) {
   const promiseChain = getFirstCurrentClient().then((client) => {
     if (client) return client.focus();
-    const alertUrl = new URL(self.location.origin);
-    return clients.openWindow(alertUrl);
+    const alertUrl = new URL(self.location);
+    return clients.openWindow(appUrl);
   });
 
   event.waitUntil(promiseChain);
