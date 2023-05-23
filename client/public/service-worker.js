@@ -24,7 +24,6 @@ self.addEventListener('push', async (event) => {
 self.addEventListener('notificationclick', function (event) {
   const promiseChain = getFirstCurrentClient().then((client) => {
     if (client) return client.focus();
-    const alertUrl = new URL(self.location);
     return clients.openWindow(appUrl);
   });
 

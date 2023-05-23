@@ -19,7 +19,7 @@ async function displayNotifications() {
 
   notifications.forEach((notification) => {
     const li = document.createElement('li');
-    li.textContent = `${notification.data.date.toLocaleString()} - ${notification.data.log}`;
+    li.textContent = `${notification.data?.date?.toLocaleString()} - ${notification.body}`;
     notificationsEl.appendChild(li);
   });
 }
@@ -136,6 +136,16 @@ async function initialize(askPermissionBtn: HTMLElement) {
 
   notifications = await serviceWorkerRegistration.getNotifications();
   displayNotifications();
+
+  const tryNotificationButton = document.getElementById('try-notification');
+  if (!tryNotificationButton) return;
+  tryNotificationButton.addEventListener('click', () => {
+    serviceWorkerRegistration.showNotification('Test notification', {
+      icon: './android-chrome-192x192.png',
+      body: 'Ceci est une notification de test',
+      data: {date: new Date()},
+    });
+  });
 
   // A message is posted when a new notification is received
   navigator.serviceWorker.addEventListener('message', (e: MessageEvent<Notification>) => {
