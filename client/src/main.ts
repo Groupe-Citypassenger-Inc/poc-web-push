@@ -8,6 +8,21 @@ interface Alert {
 let alerts = [] as Alert[];
 let notifications = [] as Notification[];
 
+function setupNotificationTest(serviceWorkerRegistration: ServiceWorkerRegistration) {
+  const tryNotificationButton = document.getElementById('try-notification');
+  if (!tryNotificationButton) return;
+  tryNotificationButton.addEventListener('click', () => {
+    const testNotification: NotificationOptions = {
+      icon: './android-chrome-192x192.png',
+      body: 'Ceci est une notification de test',
+      data: { date: new Date() },
+    }
+    serviceWorkerRegistration.showNotification('Test notification', testNotification);
+    notifications.push(new Notification('Test notification', testNotification));
+    displayNotifications();
+  });
+}
+
 async function displayNotifications() {
   const noNotificationEl = document.getElementById('no-notification');
   const notificationsEl = document.getElementById('notifications');
@@ -134,18 +149,10 @@ async function initialize(askPermissionBtn: HTMLElement) {
   const serviceWorkerRegistration = await navigator.serviceWorker.getRegistration()
     ?? await registerServiceWorker();
 
+  setupNotificationTest(serviceWorkerRegistration);
+
   notifications = await serviceWorkerRegistration.getNotifications();
   displayNotifications();
-
-  const tryNotificationButton = document.getElementById('try-notification');
-  if (!tryNotificationButton) return;
-  tryNotificationButton.addEventListener('click', () => {
-    serviceWorkerRegistration.showNotification('Test notification', {
-      icon: './android-chrome-192x192.png',
-      body: 'Ceci est une notification de test',
-      data: {date: new Date()},
-    });
-  });
 
   // A message is posted when a new notification is received
   navigator.serviceWorker.addEventListener('message', (e: MessageEvent<Notification>) => {
