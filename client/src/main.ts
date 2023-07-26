@@ -1,6 +1,8 @@
 import './style.css';
 
 interface Alert {
+  id: number,
+  name: string,
   regex: string;
   is_notified: 1 | 0,
 }
@@ -40,11 +42,9 @@ async function displayNotifications() {
 }
 
 async function unsubscribe(subscription: PushSubscription, alert: Alert) {
-  fetch('./wps/delete-subscription', {
-    method: 'DELETE',
+  fetch(`./wps/unsubscribe/${alert.id}`, {
+    method: 'POST',
     body: new URLSearchParams({
-      groupName: 'dev-nathan',
-      regex: alert.regex,
       subscription: JSON.stringify(subscription.toJSON()),
     })
   }).then(() => {
@@ -54,15 +54,30 @@ async function unsubscribe(subscription: PushSubscription, alert: Alert) {
 }
 
 function subscribe(subscription: PushSubscription, alert: Alert) {
-  fetch('./wps/subscribe', {
+  fetch(`./wps/subscribe/${alert.id}`, {
     method: 'POST',
     body: new URLSearchParams({
-      groupName: 'dev-nathan',
-      regex: alert.regex,
       subscription: JSON.stringify(subscription.toJSON()),
     })
   }).then(() => {
     alert.is_notified = 1;
+    displayAlerts(subscription);
+  });
+}
+
+function createAlert(subscription: PushSubscription, alert: Partial<Alert>) {
+  fetch(`./wps/alert`, {
+    method: 'POST',
+    body: new URLSearchParams({
+      group_name: 'dev-sandbox',
+      regex: alert.regex,
+      name: alert.name,
+    })
+  })
+  .then((resp) => resp.text())
+  .then((id) => {
+    alert.id = Number(id);
+    alerts.push(alert as Alert);
     displayAlerts(subscription);
   });
 }
@@ -82,18 +97,18 @@ function displayAlerts(subscription: PushSubscription) {
     button.onclick = () => (alert.is_notified ? unsubscribe : subscribe)(subscription, alert);
     const li = document.createElement('li');
     const notifyText = alert.is_notified ? 'Notifié sur ce navigateur' : 'Non notifié sur ce navigateur';
-    li.textContent = `"${alert.regex}" (${notifyText})`;
+    li.textContent = `"${alert.name}" (${notifyText})`;
     li.appendChild(button);
     alertsEl.appendChild(li);
   })
 }
 
 function fetchAndDisplayAlerts(subscription: PushSubscription) {
-  fetch('./wps/get-subscriptions', {
+  fetch('./wps/register', {
     method: 'POST',
     body: new URLSearchParams({
-      groupName: 'dev-nathan',
       subscription: JSON.stringify(subscription.toJSON()),
+      group_name: 'dev-sandbox',
     }),
   })
     .then(response => response.json())
@@ -109,10 +124,10 @@ function handleCreateAlertForm(subscription: PushSubscription) {
   form.onsubmit = (event) => {
     event.preventDefault();
     const form = event.target as HTMLFormElement;
+    const name = (form.name as any).value as string;
     const regex = form.regex.value as string;
-    const newAlert: Alert = { regex, is_notified: 0 };
-    alerts.push(newAlert);
-    subscribe(subscription, newAlert);
+    const newAlert: Partial<Alert> = { name, regex, is_notified: 0 };
+    createAlert(subscription, newAlert);
   }
 }
 
@@ -127,7 +142,7 @@ function handleSimulateLogForm() {
     fetch('./wps/simulate-log', {
       method: 'POST',
       body: new URLSearchParams({
-        groupName: 'dev-nathan',
+        groupName: 'dev-sandbox',
         log: newLog,
       })
     });
@@ -170,6 +185,8 @@ async function initialize(askPermissionBtn: HTMLElement) {
 
   const subscription = await serviceWorkerRegistration.pushManager.getSubscription()
     ?? await createSubscription();
+
+    console.log(subscription);
 
   fetchAndDisplayAlerts(subscription);
   handleCreateAlertForm(subscription);

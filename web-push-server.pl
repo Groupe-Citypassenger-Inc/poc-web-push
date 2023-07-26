@@ -1,176 +1,38 @@
-use Mojolicious::Lite;
-use Mojo::File;
-use Mojo::UserAgent;
-use JSON::XS;
-use HTTP::Request::Webpush;
-use File::Path qw(make_path);
+#!/usr/bin/env perl
+use strict;
+use utf8;
+use lib '.';
+use Mojolicious::Lite -signatures;
+use Mojo::SQLite;
 use Dotenv -load;
-use Data::Dumper;
-use Crypt::PK::ECC;
+use Wps::SendNotification;
 
-sub notify {
-  my ($c, $subscriptions, $regex, $log) = @_;
+# Add controller path to the app
+push @{app->routes->namespaces}, 'Wps';
 
-  my $payload = { 
-    title => "Nouvelle alerte \"$regex\" !",
-    body => "Log: \"$log\"",
-    data => {
-      log => $log,
-      regex => $regex,
-    },
-  };
-
-  foreach my $subscription (@{$subscriptions}) {
-    my $message = HTTP::Request::Webpush->new();
-  
-    $message->subject('mailto:hello@citypassenger.com');
-    $message->content(encode_json($payload));
-    $message->authbase64($ENV{PUBLIC_KEY}, $ENV{PRIVATE_KEY});
-    $message->header('TTL' => 60 * 60);
-
-    my $ua = Mojo::UserAgent->new;
-
-    $message->subscription($subscription);
-    $message->encode();
-
-    my %headers_hash;
-    foreach my $field_name ($message->headers->header_field_names) {
-      $headers_hash{$field_name} = $message->headers->header($field_name);
-    }
-
-    my $tx = $ua->build_tx(POST => $subscription->{endpoint} => \%headers_hash => $message->content);
-    my $res = $ua->start($tx)->result;
-
-    if ($res->is_success) {
-       $c->app->log->info("Push notification sent for $regex to ". $subscription->{endpoint});
-    } else {
-      $c->app->log->warn("Failed to send push notification: " . $res->message);
-      $c->rendered(500);
-    }
-  }
-}
-
-sub get_subscribtions {
-  my $group_name = shift;
-
-  my $subscription_file = "subscriptions/$group_name.json";
-  my $file = Mojo::File->new($subscription_file);
-
-  return ( undef, $file ) unless (-e $file->path);
-
-  my $subscriptions_data = $file->slurp;
-  my $subscriptions = decode_json($subscriptions_data);
-
-  return ( $subscriptions, $file );
-}
-
-post '/wps/subscribe' => sub {
-  my $c = shift;
-
-  my $group_name = $c->param('groupName');
-  my $regex = $c->param('regex');
-  my $subscription = $c->param('subscription');
-
-  my ($subscriptions, $file) = get_subscribtions($group_name);
-
-  print $regex;
-
-  unless ($subscriptions) {
-    $c->app->log->info("Creating new subscription file for group $group_name");
-    make_path($file->dirname);    
-    $subscriptions = {};
-  }
-
-  push @{$subscriptions->{$regex}}, decode_json($subscription);
-
-  $file->spurt(encode_json($subscriptions));
-
-  $c->rendered(200);
+helper sqlite => sub { 
+  state $sqlite = Mojo::SQLite->new('sqlite:web-push-server.db');
+  $sqlite->on(connection => sub ($sql, $dbh) {
+    $dbh->do('PRAGMA foreign_keys = ON');
+  });
+  return $sqlite;
 };
 
-post '/wps/get-subscriptions' => sub {
-  my $c = shift;
-  my $group_name = $c->param('groupName');
-  my $json_subscription = $c->param('subscription');
-  my $subscription = decode_json($json_subscription);
+plugin Minion => { SQLite => app->sqlite };
 
-  my ($subscriptions) = get_subscribtions($group_name);
-  unless ($subscriptions) {
-      $c->render( json => [] );
-      return;
-  }
+app->minion->add_task(notify => \&Wps::SendNotification::send_notification);
 
-  my @matching_keys;
+# TODO: Require local_request
+my $subscription_controller = app->routes->any('/wps')->to(controller => 'Subscription');
+$subscription_controller->post('/alert')->to(action => 'create_alert');
+$subscription_controller->delete('/alert/:id')->to(action => 'delete_alert');
+$subscription_controller->post('/register')->to(action => 'register_and_get_alerts');
+$subscription_controller->post('/subscribe/:id')->to(action => 'subscribe');
+$subscription_controller->post('/unsubscribe/:id')->to(action => 'unsubscribe');
 
-  # Iterate over the keys and values in the data hash
-  while (my ($key, $value) = each %$subscriptions) {
-    my $alert = { regex => $key, is_notified => 0 };
-    foreach my $elem (@$value) {
-      if ($elem->{endpoint} eq $subscription->{endpoint}) {
-        $alert->{is_notified} = 1;
-        last;
-      }
-    }
-    push @matching_keys, $alert;
-  }
-
-  $c->render( json => \@matching_keys );
-};
-
-del '/wps/delete-subscription' => sub {
-  my $c = shift;
-  my $group_name = $c->param('groupName');
-  my $regex = $c->param('regex');
-  my $json_subscription = $c->param('subscription');
-  my $subscription = decode_json($json_subscription);
-
-  my ($subscriptions, $file) = get_subscribtions($group_name);
-  unless ($subscriptions) {
-    $c->app->log->info("No subscriptions found for $group_name");
-    $c->rendered(404);
-  }
-
-  my $regex_subscription = $subscriptions->{$regex};
-
-  my $index_to_delete = -1;
-  for (my $i = 0; $i < @$regex_subscription; $i++) {
-    if ($regex_subscription->[$i]->{endpoint} eq $subscription->{endpoint}) {
-      $index_to_delete = $i;
-      last;
-    }
-  }
-
-  unless ($index_to_delete >= 0) {
-    $c->app->log->info("No subscriptions found for regex pattern $regex in group $group_name");
-    $c->rendered(404);
-  }
-
-  splice(@$regex_subscription, $index_to_delete, 1);
-
-  $file->spurt(encode_json($subscriptions));
-
-  $c->rendered(200);
-};
-
-# DEMO function - To remove
-post '/wps/simulate-log' => sub {
-  my $c = shift;
-  my $log = $c->param('log');
-  my $group_name = $c->param('groupName');
-
-  my ($subscriptions) = get_subscribtions($group_name);
-
-  unless ($subscriptions) {
-    $c->rendered(200);
-  }
-
-  my @matching_keys = grep { $log =~ /$_/ } keys %$subscriptions;
-
-  foreach my $key (@matching_keys) {
-    notify($c, $subscriptions->{$key}, $key, $log);
-  }
-
-  $c->rendered(200);
-};
+# TODO: Require admin_request
+my $notify_controller = app->routes->any('/wps/notify')->to(controller => 'Notifier');
+$notify_controller->get('/:group_name')->to(action => 'get_regex_subsbscriptions');
+$notify_controller->post('/:id')->to(action => 'notify');
 
 app->start;

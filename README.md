@@ -23,17 +23,35 @@ Once evrything is set (serviceworker and subscription), the client must symply s
 
 Notifications are send using [HTTP::Request::Webpush](https://metacpan.org/pod/HTTP::Request::Webpush). Server must first store subscription objects (from clients) and then can use Webpush to send notification to the wanted subscriptions. In order to encode the payload and provide authentification header it must have a private and and public (the same used in subscription creation) VAPID keys.
 
-For this POC, subscriptions are stored in files like `subscriptions/$group_name.jon` with the following data structure:
+Subscriptions are stored in a SQLite Database following this schema :
 
-```ts
-interface RegexSubscriptions { 
-  [regex: string]: Subscription[],
-}
+```sql
+CREATE TABLE IF NOT EXISTS alerts (
+    id INTEGER PRIMARY KEY,
+    group_name TEXT NOT NULL,
+    name TEXT NOT NULL,
+    regex TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS subscriptions (
+    id INTEGER PRIMARY KEY,
+    browser_info JSON NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS alerts_subscriptions (
+    alert_id INTEGER NOT NULL,
+    subscription_id INTEGER NOT NULL,
+    PRIMARY KEY (alert_id, subscription_id),
+    FOREIGN KEY (alert_id) REFERENCES alerts(id) ON DELETE CASCADE,
+    FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE CASCADE
+);
 ```
 
-Apart from the notify sub that sends a log payload to all the given subsciptions, the rest of the API is used to handle add, delete and get subscriptions.
+In order to make `ON DELETE CASCADE` works it's necessary to specify:
 
-Another endpoint is also available to simulate a new log and trigger the sending of a notification if the regex match.
+```sql
+PRAGMA foreign_keys = ON;
+```
 
 ## Installation
 
@@ -92,3 +110,6 @@ For the server there is 2 ways :
   echo export PUBLIC_KEY=... >> ~/.profile
   ```
 
+### Setup the database
+
+Create `web-push-server.db` and use the schema.
