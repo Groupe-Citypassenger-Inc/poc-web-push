@@ -4,7 +4,7 @@ interface Alert {
   id: number,
   name: string,
   regex: string;
-  is_notified: 1 | 0,
+  is_subscribe: 1 | 0,
 }
 
 let alerts = [] as Alert[];
@@ -48,7 +48,7 @@ async function unsubscribe(subscription: PushSubscription, alert: Alert) {
       subscription: JSON.stringify(subscription.toJSON()),
     })
   }).then(() => {
-    alert.is_notified = 0;
+    alert.is_subscribe = 0;
     displayAlerts(subscription);
   });
 }
@@ -60,7 +60,7 @@ function subscribe(subscription: PushSubscription, alert: Alert) {
       subscription: JSON.stringify(subscription.toJSON()),
     })
   }).then(() => {
-    alert.is_notified = 1;
+    alert.is_subscribe = 1;
     displayAlerts(subscription);
   });
 }
@@ -93,10 +93,10 @@ function displayAlerts(subscription: PushSubscription) {
 
   alerts.forEach((alert) => {
     const button = document.createElement('button');
-    button.innerText = alert.is_notified ? 'Ne plus me notifier sur ce navigateur' : 'Me notifier sur ce navigateur';
-    button.onclick = () => (alert.is_notified ? unsubscribe : subscribe)(subscription, alert);
+    button.innerText = alert.is_subscribe ? 'Ne plus me notifier sur ce navigateur' : 'Me notifier sur ce navigateur';
+    button.onclick = () => (alert.is_subscribe ? unsubscribe : subscribe)(subscription, alert);
     const li = document.createElement('li');
-    const notifyText = alert.is_notified ? 'Notifié sur ce navigateur' : 'Non notifié sur ce navigateur';
+    const notifyText = alert.is_subscribe ? 'Notifié sur ce navigateur' : 'Non notifié sur ce navigateur';
     li.textContent = `"${alert.name}" (${notifyText})`;
     li.appendChild(button);
     alertsEl.appendChild(li);
@@ -126,7 +126,7 @@ function handleCreateAlertForm(subscription: PushSubscription) {
     const form = event.target as HTMLFormElement;
     const name = (form.name as any).value as string;
     const regex = form.regex.value as string;
-    const newAlert: Partial<Alert> = { name, regex, is_notified: 0 };
+    const newAlert: Partial<Alert> = { name, regex, is_subscribe: 0 };
     createAlert(subscription, newAlert);
   }
 }
@@ -149,7 +149,20 @@ function handleSimulateLogForm() {
   }
 }
 
-async function initialize(askPermissionBtn: HTMLElement) {
+function handleRegeneratePubKeyForm(subscription: PushSubscription, askPermissionBtn: HTMLElement) {
+  const form = document.getElementById('regen-pub-key');
+  if (!form) return;
+
+  form.onsubmit = async (event) => {
+    event.preventDefault();
+    const form = event.target as HTMLFormElement;
+    const newKey = form.pubkey.value;
+    subscription.unsubscribe();
+    initialize(askPermissionBtn, newKey);
+  };
+}
+
+async function initialize(askPermissionBtn: HTMLElement, pubkey = __APP_PUSH_PUBLIC_KEY__) {
   const app = document.getElementById('app');
   if (!app) return;
   app.style.display = 'block';
@@ -175,22 +188,23 @@ async function initialize(askPermissionBtn: HTMLElement) {
     displayNotifications();
   });
 
-  const createSubscription = (): Promise<PushSubscription> => {
+  const createSubscription = () => {
     console.log('Creating subscription');
     return serviceWorkerRegistration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: __APP_PUSH_PUBLIC_KEY__,
-    });
+      applicationServerKey: pubkey,
+    }).catch((err) => alert(err.message));
   }
 
   const subscription = await serviceWorkerRegistration.pushManager.getSubscription()
     ?? await createSubscription();
 
-    console.log(subscription);
+  if (!subscription) return;
 
   fetchAndDisplayAlerts(subscription);
   handleCreateAlertForm(subscription);
   handleSimulateLogForm();
+  handleRegeneratePubKeyForm(subscription, askPermissionBtn);
 }
 
 (async () => {
