@@ -71,9 +71,83 @@ cpanm Dotenv;
 
 - Using openssl
 
+Keys for notification are in  https://www.rfc-editor.org/rfc/rfc7518
+and should use:
+```
+| ES256        | ECDSA using P-256 and SHA-256 | Recommended+       |
+```
+The Payload encryption use GCM ( gallois counter mode ) *
+For the client the key are stored in base64 url form.
+
+To generate a ECDSA key (using curve name prime256v1 instead of secp256r1 because ... ):
   ```
-  TODO
+  openssl ecparam -out vapid_v2.pem -name prime256v1 -genkey
   ```
+
+Then to extract the key
+
+```
+$ openssl asn1parse -in p256v1SamplePKEY.pem
+    0:d=0  hl=2 l= 119 cons: SEQUENCE
+    2:d=1  hl=2 l=   1 prim: INTEGER           :01
+    5:d=1  hl=2 l=  32 prim: OCTET STRING      [HEX DUMP]:FBxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxA6
+   39:d=1  hl=2 l=  10 cons: cont [ 0 ]
+   41:d=2  hl=2 l=   8 prim: OBJECT            :prime256v1
+   51:d=1  hl=2 l=  68 cons: cont [ 1 ]
+   53:d=2  hl=2 l=  66 prim: BIT STRING
+$ openssl ec -in p256v1SamplePKEY.pem  -text
+will give you the info but may botched the ouput
+# echo note that
+$ perl -e '@array = ( "aabbccdd" =~ m/../g );' -e 'print $array[1]."\n";'
+bb
+```
+so the perl script, getit.pl:
+```
+use MIME::Base64;
+$/ = undef
+my @karr = ( <> =~ m/../g );
+my $k = '';
+foreach $a (@karr) {
+  my $x =  pack 'H*', $a;
+  $k .= $x;
+}
+print MIME::Base64::encode_base64url($k);
+```
+should work and give you the ( private key )
+
+```
+$ printf 'FBxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxA6' | perl getit.pl
+```
+
+There s other way to do that, for the public part, dont ask y but getting the value is a bit different
+```
+openssl ec -in p256v1SamplePKEY.pem  -pubout >  p256v1SamplePUB
+$ openssl asn1parse -in p256v1SamplePUB
+    0:d=0  hl=2 l=  89 cons: SEQUENCE
+    2:d=1  hl=2 l=  19 cons: SEQUENCE
+    4:d=2  hl=2 l=   7 prim: OBJECT            :id-ecPublicKey
+   13:d=2  hl=2 l=   8 prim: OBJECT            :prime256v1
+   23:d=1  hl=2 l=  66 prim: BIT STRING
+$ openssl ec -pubin -in p256v1SamplePUB -noout -text
+read EC key
+Private-Key: (256 bit)
+pub:
+    04:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:
+    XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:
+    XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:
+    XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:
+    XX:XX:XX:XX:45
+# remove the white space and use that buffer
+$ perl -MMIME::Base64 -e '$pk = ''; foreach $x (split /:/, "04:xxx:45") { $pk .= pack 'H*', $x }; MIME::Base64::encode_base64url($pk);' 
+```
+
+This works and give you a key.
+
+The baes64 encoded key is fixed in length afaik, 
+43 character for the private part
+and 87 for the public one.
+
+Following/Below methods ARE NOT RECOMMENDED
 
 - Using npx
 
